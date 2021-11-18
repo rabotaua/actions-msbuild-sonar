@@ -1,0 +1,111 @@
+name: "msbuild sonar"
+description: "GitHub Action MSBuild SonarCloud"
+inputs:
+
+  solution:
+    description: 'relative path to solution file'
+    required: true
+
+  github_token:
+    description: 'github token for sonar, usually secrets.GITHUB_TOKEN'
+    required: true
+
+  sonar_enabled:
+    description: 'switch to turn on/off sonar scanner, usefull for debugging'
+    required: false
+    default: true
+
+  # Removed in favor to https://github.com/rabotaua/actions-sonar-register
+  # sonar_key:
+  #   description: 'sonar project key, it will be given to you after adding project to sonarcloud.io'
+  #   required: false
+
+  sonar_org:
+    description: 'sonar project org, usually it will be "rua"'
+    required: false
+    default: 'rua'
+
+  sonar_url:
+    description: 'sonar url, to where data will be sent'
+    required: false
+    default: 'https://sonarcloud.io'
+
+  sonar_token:
+    description: 'sonar token, usually it will be secrets.SONAR_TOKEN'
+    required: false
+
+  checkout:
+    description: 'checkout sources'
+    required: false
+    default: true
+
+runs:
+  using: 'composite'
+  steps:
+
+  - uses: actions/checkout@v2
+    if: inputs.checkout
+    with:
+      fetch-depth: 0
+
+  - uses: rabotaua/actions-sonar-register@main
+    id: register
+    if: inputs.sonar_enabled
+    with:
+      token: ${{ inputs.sonar_token }}
+
+  - uses: actions/setup-java@v1
+    if: inputs.sonar_enabled
+    with:
+      java-version: 1.11
+
+  # required by sonar scanner dotnet tool
+  - uses: actions/setup-dotnet@v1
+    with:
+      dotnet-version: '5.0'
+
+  - name: msbuild
+    uses: microsoft/setup-msbuild@v1.0.2
+
+  - name: nuget
+    uses: nuget/setup-nuget@v1
+
+  - name: restore
+    run: nuget restore ${{ inputs.solution }}
+
+  - uses: actions/cache@v1
+    if: inputs.sonar_enabled
+    with:
+      path: ~\sonar\cache
+      key: ${{ runner.os }}-sonar
+      restore-keys: ${{ runner.os }}-sonar
+
+  - uses: actions/cache@v1
+    if: inputs.sonar_enabled
+    id: cache-sonar-scanner
+    with:
+      path: .\.sonar\scanner
+      key: ${{ runner.os }}-sonar-scanner
+      restore-keys: ${{ runner.os }}-sonar-scanner
+
+  - name: sonar install
+    if: inputs.sonar_enabled && steps.cache-sonar-scanner.outputs.cache-hit != 'true'
+    shell: bash
+    run: mkdir -p ./.sonar/scanner && dotnet tool update dotnet-sonarscanner --tool-path ./.sonar/scanner
+
+  - name: sonar begin
+    if: inputs.sonar_enabled
+    shell: bash
+    run: ./.sonar/scanner/dotnet-sonarscanner begin /k:"${{ steps.register.outputs.key }}" /o:"${{ inputs.sonar_org }}" /d:sonar.login="${{ inputs.sonar_token }}" /d:"sonar.host.url=${{ inputs.sonar_url }}"
+    env:
+      GITHUB_TOKEN: ${{ inputs.github_token }}
+
+  - name: build
+    run: msbuild ${{ inputs.solution }} /t:Build  /p:Configuration=Release
+
+  - name: sonar end
+    if: inputs.sonar_enabled
+    shell: bash
+    run: ./.sonar/scanner/dotnet-sonarscanner end /d:sonar.login="${{inputs.sonar_token}}"
+    env:
+      GITHUB_TOKEN: ${{ inputs.github_token }}
