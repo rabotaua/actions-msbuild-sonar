@@ -17,5 +17,5 @@ There are bunch of inputs which are documented in [action.yml](action.yml)
   with:
     sonar_token: ${{ secrets.SONAR_TOKEN }}
     github_token: ${{ secrets.GITHUB_TOKEN }}
-    dotnet_version: '6.0'
+    solution: 'MyProject.sln'
 ```
