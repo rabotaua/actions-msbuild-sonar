@@ -71,6 +71,7 @@ runs:
     uses: nuget/setup-nuget@v1
 
   - name: restore
+    shell: powershell
     run: nuget restore ${{ inputs.solution }}
 
   - uses: actions/cache@v1
@@ -90,22 +91,25 @@ runs:
 
   - name: sonar install
     if: inputs.sonar_enabled && steps.cache-sonar-scanner.outputs.cache-hit != 'true'
-    shell: bash
-    run: mkdir -p ./.sonar/scanner && dotnet tool update dotnet-sonarscanner --tool-path ./.sonar/scanner
+    shell: powershell
+    run: |
+      New-Item -Path .\.sonar\scanner -ItemType Directory
+      dotnet tool update dotnet-sonarscanner --tool-path .\.sonar\scanner
 
   - name: sonar begin
     if: inputs.sonar_enabled
-    shell: bash
-    run: ./.sonar/scanner/dotnet-sonarscanner begin /k:"${{ steps.register.outputs.key }}" /o:"${{ inputs.sonar_org }}" /d:sonar.login="${{ inputs.sonar_token }}" /d:"sonar.host.url=${{ inputs.sonar_url }}"
+    shell: powershell
+    run: .\.sonar\scanner\dotnet-sonarscanner begin /k:"${{ steps.register.outputs.key }}" /o:"${{ inputs.sonar_org }}" /d:sonar.login="${{ inputs.sonar_token }}" /d:"sonar.host.url=${{ inputs.sonar_url }}"
     env:
       GITHUB_TOKEN: ${{ inputs.github_token }}
 
   - name: build
+    shell: powershell
     run: msbuild ${{ inputs.solution }} /t:Build  /p:Configuration=Release
 
   - name: sonar end
     if: inputs.sonar_enabled
-    shell: bash
-    run: ./.sonar/scanner/dotnet-sonarscanner end /d:sonar.login="${{inputs.sonar_token}}"
+    shell: powershell
+    run: .\.sonar\scanner\dotnet-sonarscanner end /d:sonar.login="${{inputs.sonar_token}}"
     env:
       GITHUB_TOKEN: ${{ inputs.github_token }}
