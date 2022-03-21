@@ -74,14 +74,14 @@ runs:
     shell: powershell
     run: nuget restore ${{ inputs.solution }}
 
-  - uses: actions/cache@v1
+  - uses: actions/cache@v3
     if: inputs.sonar_enabled
     with:
       path: ~\sonar\cache
       key: ${{ runner.os }}-sonar
       restore-keys: ${{ runner.os }}-sonar
 
-  - uses: actions/cache@v1
+  - uses: actions/cache@v3
     if: inputs.sonar_enabled
     id: cache-sonar-scanner
     with:
